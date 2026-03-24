@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RexDev FB Downloader</title>
+    <style>
+        :root { --fb-blue: #0866ff; --bg: #f2f4f7; }
+        body { font-family: -apple-system, sans-serif; background: var(--bg); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; padding: 15px; }
+        
+        .container { background: white; width: 100%; max-width: 420px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); padding: 30px; text-align: center; }
+        h1 { color: var(--fb-blue); margin-bottom: 5px; font-size: 24px; }
+        .tagline { color: #65676b; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 25px; }
+
+        .input-wrapper { margin-bottom: 15px; }
+        input { width: 100%; padding: 14px; border: 2px solid #ddd; border-radius: 10px; font-size: 15px; outline: none; transition: 0.3s; box-sizing: border-box; }
+        input:focus { border-color: var(--fb-blue); }
+        
+        #fetchBtn { width: 100%; background: var(--fb-blue); color: white; border: none; padding: 14px; border-radius: 10px; font-weight: bold; cursor: pointer; font-size: 16px; }
+        #fetchBtn:disabled { background: #bcc0c4; cursor: not-allowed; }
+
+        /* Result Section */
+        #result { margin-top: 25px; display: none; text-align: left; border-top: 1px solid #eee; padding-top: 20px; }
+        .preview-card { border: 1px solid #eee; border-radius: 12px; overflow: hidden; background: #fafafa; }
+        .thumb { width: 100%; height: 180px; object-fit: cover; background: #000; }
+        .info { padding: 15px; }
+        .video-title { font-weight: bold; font-size: 15px; color: #1c1e21; display: block; margin-bottom: 12px; }
+        
+        .download-btn { 
+            display: flex; align-items: center; justify-content: center;
+            background: #24a0ed; color: white; text-decoration: none; 
+            padding: 12px; border-radius: 8px; font-weight: bold; width: 100%;
+            border: none; cursor: pointer; font-size: 15px;
+        }
+        .download-btn:hover { background: #1a88cc; }
+        
+        .loader { display: none; margin: 20px auto; border: 4px solid #f3f3f3; border-top: 4px solid var(--fb-blue); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .error { color: #d32f2f; background: #ffebee; padding: 10px; border-radius: 8px; font-size: 13px; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>FB Downloader</h1>
+    <div class="tagline">Powered by RexDev</div>
+
+    <div class="input-wrapper">
+        <input type="text" id="fbLink" placeholder="Paste Facebook video URL here...">
+    </div>
+    <button id="fetchBtn" onclick="getVideoInfo()">Get Download Link</button>
+
+    <div id="loader" class="loader"></div>
+    <div id="result"></div>
+</div>
+
+<script>
+    async function getVideoInfo() {
+        const input = document.getElementById('fbLink');
+        const fetchBtn = document.getElementById('fetchBtn');
+        const resultDiv = document.getElementById('result');
+        const loader = document.getElementById('loader');
+
+        if (!input.value.trim()) return alert("Please paste a link!");
+
+        // Set Loading State
+        resultDiv.style.display = "none";
+        loader.style.display = "block";
+        fetchBtn.disabled = true;
+
+        try {
+            // 1. API URL Construction
+            const apiUrl = `https://shin-apis.gleeze.com/downloader/fbdl?url=${encodeURIComponent(input.value.trim())}`;
+            
+            // 2. Use AllOrigins Proxy to bypass GitHub Pages CORS restrictions
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(apiUrl)}`;
+            
+            const response = await fetch(proxyUrl);
+            const proxyData = await response.json();
+            const data = JSON.parse(proxyData.contents); // This is your RexDev API response
+
+            loader.style.display = "none";
+            fetchBtn.disabled = false;
+
+            if (data.answer && data.answer.url) {
+                resultDiv.style.display = "block";
+                resultDiv.innerHTML = `
+                    <div class="preview-card">
+                        <img src="${data.answer.thumbnail}" class="thumb">
+                        <div class="info">
+                            <span class="video-title">${data.answer.title || 'Facebook Video'}</span>
+                            <button class="download-btn" onclick="downloadDirectly('${data.answer.url}', 'RexDev_FB_Video.mp4')">
+                                📥 Start Direct Download
+                            </button>
+                        </div>
+                    </div>
+                    <p style="font-size:10px; color:#999; text-align:center; margin-top:10px;">
+                        Operator: ${data.operator} | Time: ${data.responseTime}
+                    </p>
+                `;
+            } else {
+                showError(data.error || "Video not found. Is it private?");
+            }
+        } catch (err) {
+            loader.style.display = "none";
+            fetchBtn.disabled = false;
+            showError("Network Error. GitHub Pages blocked the connection or API is down.");
+        }
+    }
+
+    // THE DIRECT DOWNLOAD MAGIC
+    async function downloadDirectly(videoUrl, filename) {
+        const btn = document.querySelector('.download-btn');
+        const originalText = btn.innerHTML;
+        
+        btn.innerHTML = "⏳ Preparing File...";
+        btn.disabled = true;
+
+        try {
+            // Fetching the video through a proxy to avoid CORS blocks on the video file itself
+            const proxyVideoUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(videoUrl)}`;
+            
+            const response = await fetch(proxyVideoUrl);
+            const blob = await response.blob();
+            const blobUrl = window.URL.createObjectURL(blob);
+            
+            // Create a hidden link and click it
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            // Cleanup
+            window.URL.revokeObjectURL(blobUrl);
+            btn.innerHTML = "✅ Download Started!";
+            setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 3000);
+            
+        } catch (e) {
+            // Fallback if blob download is blocked: open in new tab
+            window.open(videoUrl, '_blank');
+            btn.innerHTML = "Open Video (Right click to save)";
+            setTimeout(() => { btn.innerHTML = originalText; btn.disabled = false; }, 3000);
+        }
+    }
+
+    function showError(msg) {
+        const resultDiv = document.getElementById('result');
+        resultDiv.style.display = "block";
+        resultDiv.innerHTML = `<div class="error">${msg}</div>`;
+    }
+</script>
+
+</body>
+</html>
