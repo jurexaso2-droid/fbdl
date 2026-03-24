@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RexDev FB Downloader</title>
+    <style>
+        :root { --primary: #1877f2; --bg: #f0f2f5; --text: #1c1e21; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--text); display: flex; justify-content: center; align-items: center; min-height: 100vh; margin: 0; }
+        .container { background: white; width: 90%; max-width: 450px; padding: 25px; border-radius: 15px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; }
+        h1 { font-size: 22px; color: var(--primary); margin: 0; }
+        .subtitle { font-size: 12px; color: #65676b; margin-bottom: 20px; text-transform: uppercase; }
+        input { width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 15px; box-sizing: border-box; margin-bottom: 10px; }
+        button#dlBtn { width: 100%; background: var(--primary); color: white; border: none; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        #result { margin-top: 25px; display: none; text-align: left; }
+        .video-preview { border: 1px solid #ddd; border-radius: 10px; overflow: hidden; }
+        .thumb { width: 100%; height: auto; display: block; background: #000; }
+        .details { padding: 15px; }
+        .action-btn { display: block; background: #28a745; color: white; text-align: center; text-decoration: none; padding: 10px; border-radius: 6px; font-weight: bold; margin-top: 10px; }
+        .loader { display: none; margin: 20px auto; border: 4px solid #f3f3f3; border-top: 4px solid var(--primary); border-radius: 50%; width: 30px; height: 30px; animation: spin 1s linear infinite; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .error-msg { color: #d32f2f; background: #ffebee; padding: 10px; border-radius: 8px; font-size: 14px; margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>FB Downloader</h1>
+    <div class="subtitle">Powered by RexDev</div>
+
+    <input type="text" id="fbUrl" placeholder="Paste Facebook link here..." />
+    <button id="dlBtn" onclick="fetchVideo()">Get Video</button>
+
+    <div id="loader" class="loader"></div>
+    <div id="result"></div>
+</div>
+
+<script>
+    async function fetchVideo() {
+        const input = document.getElementById('fbUrl');
+        const btn = document.getElementById('dlBtn');
+        const resultDiv = document.getElementById('result');
+        const loader = document.getElementById('loader');
+
+        if (!input.value.trim()) {
+            alert("Please paste a URL!");
+            return;
+        }
+
+        resultDiv.style.display = "none";
+        loader.style.display = "block";
+        btn.disabled = true;
+
+        try {
+            // THE FIX: We use 'allorigins' as a proxy to bypass CORS/Network restrictions
+            const targetUrl = `https://shin-apis.gleeze.com/downloader/fbdl?url=${encodeURIComponent(input.value.trim())}`;
+            const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(targetUrl)}`;
+
+            const response = await fetch(proxyUrl);
+            const proxyData = await response.json();
+            
+            // The actual API response is inside proxyData.contents as a string
+            const data = JSON.parse(proxyData.contents);
+
+            loader.style.display = "none";
+            btn.disabled = false;
+
+            if (data.answer && data.answer.url) {
+                resultDiv.style.display = "block";
+                resultDiv.innerHTML = `
+                    <div class="video-preview">
+                        <img src="${data.answer.thumbnail}" class="thumb">
+                        <div class="details">
+                            <strong style="display:block; margin-bottom:5px;">${data.answer.title || 'Video Found'}</strong>
+                            <a href="${data.answer.url}" target="_blank" class="action-btn">Download Video</a>
+                        </div>
+                    </div>
+                    <p style="font-size:10px; color:#999; text-align:center;">Processed by ${data.operator}</p>
+                `;
+            } else {
+                resultDiv.style.display = "block";
+                resultDiv.innerHTML = `<div class="error-msg">Error: ${data.error || 'Video not found'}</div>`;
+            }
+
+        } catch (err) {
+            loader.style.display = "none";
+            btn.disabled = false;
+            resultDiv.style.display = "block";
+            resultDiv.innerHTML = `<div class="error-msg">Error: Make sure you have internet and the URL is correct.</div>`;
+        }
+    }
+</script>
+
+</body>
+</html>
